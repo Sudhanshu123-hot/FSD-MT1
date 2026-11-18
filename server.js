@@ -1,171 +1,103 @@
-const express = require('express');
 
+const express = require("express");
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-let registrations = [
-  {
-    id: 501,
-    participantName: 'Riya Sharma',
-    eventName: 'Tech Fest',
-    department: 'CSE',
-    ticketCount: 2,
-    paymentStatus: 'Paid',
-  },
-  {
-    id: 502,
-    participantName: 'Arjun Mehta',
-    eventName: 'Code Sprint',
-    department: 'IT',
-    ticketCount: 3,
-    paymentStatus: 'Pending',
-  },
-  {
-    id: 503,
-    participantName: 'Neha Verma',
-    eventName: 'Tech Fest',
-    department: 'ECE',
-    ticketCount: 1,
-    paymentStatus: 'Paid',
-  },
-];
-let nextRegistrationId = Math.max(...registrations.map((registration) => registration.id)) + 1;
-
-const requiredFields = [
-  'participantName',
-  'eventName',
-  'department',
-  'ticketCount',
-  'paymentStatus',
+let leaves = [
+    {
+        id: 701,
+        employeeName: "Ananya Singh",
+        employeeCode: "EMP101",
+        leaveType: "Casual",
+        days: 2,
+        status: "Pending"
+    },
+    {
+        id: 702,
+        employeeName: "Rahul Verma",
+        employeeCode: "EMP102",
+        leaveType: "Sick",
+        days: 1,
+        status: "Approved"
+    },
+    {
+        id: 703,
+        employeeName: "Simran Kaur",
+        employeeCode: "EMP103",
+        leaveType: "Earned",
+        days: 3,
+        status: "Rejected"
+    }
 ];
 
-function validateRegistration(body) {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return 'Request body must be a JSON object.';
-  }
+app.get("/api/leaves", (req, res) => {
+    res.status(200).json(leaves);
+});
 
-  for (const field of requiredFields) {
-    if (!Object.prototype.hasOwnProperty.call(body, field)) {
-      return `Missing required field: ${field}.`;
+app.post("/api/leaves", (req, res) => {
+    const newLeave = {
+        id: leaves.length + 704,
+        employeeName: req.body.employeeName,
+        employeeCode: req.body.employeeCode,
+        leaveType: req.body.leaveType,
+        days: req.body.days,
+        status: req.body.status
+    };
+
+    leaves.push(newLeave);
+
+    res.status(201).json(newLeave);
+});
+app.get("/api/leaves/:id", (req, res) => {
+    const id = Number(req.params.id);
+
+    const leave = leaves.find(l => l.id === id);
+
+    if (!leave) {
+        return res.status(404).json({ message: "Leave not found" });
     }
-  }
 
-  for (const field of ['participantName', 'eventName', 'department']) {
-    if (typeof body[field] !== 'string' || body[field].trim() === '') {
-      return `${field} must be a non-empty string.`;
+    res.status(200).json(leave);
+});
+app.put("/api/leaves/:id", (req, res) => {
+    const id = Number(req.params.id);
+
+    const leave = leaves.find(l => l.id === id);
+
+    if (!leave) {
+        return res.status(404).json({ message: "Leave not found" });
     }
-  }
 
-  if (!Number.isInteger(body.ticketCount) || body.ticketCount <= 0) {
-    return 'ticketCount must be a positive integer.';
-  }
+    leave.status = req.body.status;
 
-  if (!['Paid', 'Pending'].includes(body.paymentStatus)) {
-    return 'paymentStatus must be either Paid or Pending.';
-  }
-
-  return null;
-}
-
-function registrationFields(body) {
-  return Object.fromEntries(requiredFields.map((field) => [field, body[field]]));
-}
-
-function parseId(idParam) {
-  if (!/^\d+$/.test(idParam)) return null;
-  const id = Number(idParam);
-  return Number.isSafeInteger(id) ? id : null;
-}
-
-// Specific paths must be registered before /:id.
-app.get('/api/registrations/filter', (req, res) => {
-  const { department } = req.query;
-  if (typeof department !== 'string' || department.trim() === '') {
-    return res.status(400).json({ error: 'Provide a department query parameter.' });
-  }
-
-  const matches = registrations.filter(
-    (registration) => registration.department.toLowerCase() === department.trim().toLowerCase(),
-  );
-  return res.status(200).json(matches);
+    res.status(200).json(leave);
 });
+app.delete("/api/leaves/:id", (req, res) => {
+    const id = Number(req.params.id);
 
-app.get('/api/registrations/pending', (req, res) => {
-  res.status(200).json(
-    registrations.filter((registration) => registration.paymentStatus === 'Pending'),
-  );
+    const index = leaves.findIndex(l => l.id === id);
+
+    if (index === -1) {
+        return res.status(404).json({ message: "Leave not found" });
+    }
+
+    const deletedLeave = leaves.splice(index, 1);
+
+    res.status(200).json({
+        message: "Leave deleted successfully",
+        leave: deletedLeave[0]
+    });
 });
+app.get("/api/leaves/status/:status", (req, res) => {
+    const status = req.params.status;
 
-app.get('/api/registrations', (req, res) => {
-  res.status(200).json(registrations);
+    const filteredLeaves = leaves.filter(
+        l => l.status.toLowerCase() === status.toLowerCase()
+    );
+
+    res.status(200).json(filteredLeaves);
 });
-
-app.post('/api/registrations', (req, res) => {
-  const validationError = validateRegistration(req.body);
-  if (validationError) return res.status(400).json({ error: validationError });
-
-  const created = { id: nextRegistrationId, ...registrationFields(req.body) };
-  nextRegistrationId += 1;
-  registrations.push(created);
-  return res.status(201).json(created);
+app.listen(3000, () => {
+    console.log("Server running on port 3000");
 });
-
-app.get('/api/registrations/:id', (req, res) => {
-  const id = parseId(req.params.id);
-  if (id === null) return res.status(404).json({ error: 'Registration not found.' });
-
-  const registration = registrations.find((item) => item.id === id);
-  if (!registration) return res.status(404).json({ error: 'Registration not found.' });
-  return res.status(200).json(registration);
-});
-
-app.put('/api/registrations/:id', (req, res) => {
-  const id = parseId(req.params.id);
-  const index = registrations.findIndex((item) => item.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Registration not found.' });
-
-  const validationError = validateRegistration(req.body);
-  if (validationError) return res.status(400).json({ error: validationError });
-
-  registrations[index] = { id, ...registrationFields(req.body) };
-  return res.status(200).json(registrations[index]);
-});
-
-app.delete('/api/registrations/:id', (req, res) => {
-  const id = parseId(req.params.id);
-  const index = registrations.findIndex((item) => item.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Registration not found.' });
-
-  registrations.splice(index, 1);
-  return res.status(200).json({ message: `Registration ${id} deleted successfully.` });
-});
-
-// Cancels a registration only while its payment is still pending.
-app.post('/api/registrations/:id/cancel-pending', (req, res) => {
-  const id = parseId(req.params.id);
-  const index = registrations.findIndex((item) => item.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Registration not found.' });
-  if (registrations[index].paymentStatus !== 'Pending') {
-    return res.status(409).json({ error: 'Only pending registrations can be cancelled.' });
-  }
-
-  registrations.splice(index, 1);
-  return res.status(200).json({ message: `Pending registration ${id} cancelled successfully.` });
-});
-
-app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    return res.status(400).json({ error: 'Request body contains invalid JSON.' });
-  }
-  return res.status(500).json({ error: 'Internal server error.' });
-});
-
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`College event registration API is running at http://localhost:${PORT}`);
-  });
-}
-
-module.exports = app;
